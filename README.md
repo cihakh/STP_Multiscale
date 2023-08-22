@@ -7,7 +7,7 @@
 ## Summary of files
 ### The main functions utilized can be found in the file ''Functions_STP_multiscale.'' Wherever possible variable names are chosen to reflect those within the paper. These function are written for the wizard-hat synaptic profiles chosen in the paper. If one wishes to change this or other conventions, then portions of these functions must be rewritten accordingly. 
 ### Examples using the functions and generating plots contained within the manuscript are presented within the notebook ''Examples.ipynb.'' The Examples notebook also contains several notes on the figures and particular sections of code. 
-### txt files containing sample data for a variance plot (will be) included. Note: ensure the path to these files is correct in the Examples notebook to generate the plot.
+### txt files containing sample data for a variance plot are included. Note: ensure the path to these files is correct in the Examples notebook to generate the plot.
 ## Requirements
 ### All code was run using python 3.7. See the beginning of the Examples notebook for the specific packages utilized. Largely, NumPy and SciPy were utilized for calculations and matplotlib for plotting. tqdm was used to create progress bars and joblib for parallel computing. Note that tqdm and joblib are not necessary for the calculations themselves and can be removed from the code if one prefers. tqdm created nice progress bars and joblib aided in shortening the computation time for the 10,000 simulations needed for variance calculations. A user could use other methods if preferred.
 ### joblib requires the use of Python 3.7 or greater. More details on dependencies and installation can be found at https://joblib.readthedocs.io/en/stable/
