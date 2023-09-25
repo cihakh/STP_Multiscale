@@ -924,7 +924,7 @@ def SampledCenter_predictions(x, th_e, th_i, eps, dt, sample_vec,
     
     #initializing plasticity profiles 
     #NOTE! Rn is fed in as Rn-1, we found it was more convenient to update Rn-1 in these calculations than Rn
-    Qe,Qi,Re,Ri=np.copy(Qe0),np.copy(Qi0),np.copy(Re0)-1,np.copy(Ri0)-1
+    RQe,RQi,Re,Ri=np.copy(Re0)*np.copy(Qe0),np.copy(Ri0)*np.copy(Qi0),np.copy(Re0)-1,np.copy(Ri0)-1
     
     for time in tvec:
         We=signal.fftconvolve(kernelnoise,rng.standard_normal(lx),'same') #filtered noise
@@ -933,25 +933,16 @@ def SampledCenter_predictions(x, th_e, th_i, eps, dt, sample_vec,
         Wixi=(Wi[int((center_i+ai)/dx+indzero)]-Wi[int((center_i-ai)/dx+indzero)])*dx**0.5
 
         center_e+=(dt*(-2*ke*(center_e-center_i)
-                       +(Pnm(Qe+Re, ingral1)-Pnm(Qi+Ri, ingral2))*dx)
+                       +(Pnm(RQe+Re, ingral1)-Pnm(RQi+Ri, ingral2))*dx)
                    +(eps*dt*th_e)**0.5*(Wexe))/(2*tau_e*U_epae)
         center_i+=(dt*(-2*ki*(center_e-center_i)
-                       +(Pnm(Qe+Re, ingral3)-Pnm(Qi+Ri, ingral4))*dx)
+                       +(Pnm(RQe+Re, ingral3)-Pnm(RQi+Ri, ingral4))*dx)
                    +(eps*dt*th_i)**0.5*(Wixi))/(2*tau_i*U_ipai)
         #For the plasticity evolution: 1. centers are calculated, 
         #2. the blurred profile (centered at 0) is calculated,
         #3. the whole profile is shifted
         #one may change how these calculations are approached, this is the currently chosen method.
-        if qe0!=0:
-            center_qe+=dt*(1+beta_e)*(center_e-center_qe)/tau_qe
-            Qe=shift(QE*Err(x, -ae,ae,time,tau_qe,denom_erf_qe),int((center_qe-center_e)/dx),0)
-        else:
-            center_qe=0
-        if qi0!=0:
-            center_qi+=dt*(1+beta_i)*(center_i-center_qi)/tau_qi
-            Qi=shift(QI*Err(x, -ai,ai,time,tau_qi,denom_erf_qi),int((center_qi-center_i)/dx),0)
-        else:
-            center_qi=0
+        
         if alpha_e!=0:
             center_re+=dt*((1+(1+QE)*alpha_e)*(center_e-center_re))/tau_re
             Re=shift((RE-1)*Err(x, -ae,ae,time,tau_re,denom_erf_re),int((center_re-center_e)/dx),0)
@@ -962,7 +953,25 @@ def SampledCenter_predictions(x, th_e, th_i, eps, dt, sample_vec,
             Ri=shift((RI-1)*Err(x, -ai,ai,time,tau_ri,denom_erf_ri),int((center_ri-center_i)/dx),0)
         else:
             center_ri=0
-        
+        if qe0!=0:
+            center_qe+=dt*(1+beta_e)*(center_e-center_qe)/tau_qe
+            Qe=shift(QE*Err(x, -ae,ae,time,tau_qe,denom_erf_qe),int((center_qe-center_e)/dx),0)
+            if alpha_e!=0:
+                RQe=Qe*(Re+1)
+            else:
+                RQe=Qe
+        else:
+            center_qe=0
+        if qi0!=0:
+            center_qi+=dt*(1+beta_i)*(center_i-center_qi)/tau_qi
+            Qi=shift(QI*Err(x, -ai,ai,time,tau_qi,denom_erf_qi),int((center_qi-center_i)/dx),0)
+            if alpha_i!=0:
+                RQi=Qi*(Ri+1)
+            else:
+                RQi=Qi
+        else:
+            center_qi=0
+            
         if j<=ls:
             if time>=sample_vec[j]:
                 cent_e[j],cent_i[j],cent_qe[j],cent_qi[j],cent_re[j],cent_ri[j]=center_e,center_i,center_qe,center_qi,center_re,center_ri
@@ -1023,6 +1032,12 @@ def LongTime_dstp(x,x_1,x_2, denom):
     '''
     return (np.exp(-(x_2-x)**2/(denom))-np.exp(-(x_1-x)**2/(denom)))/(np.sqrt(np.pi*denom))
 
+def LongTime_Err(x,x_1,x_2, taup, denom):
+    '''
+    The scaled error function defined for blurred plasticity profiles in eqs 4.6 
+    '''
+    return 0.5*(erf((x_2-x)/(denom))-erf((x_1-x)/(denom)))
+
 def Diff_coeff_Plastic(x,eps, th_e, th_i, t,
                 Aee=0.5,Aei=0.15,Aie=0.15,Aii=0.01,
                 see=1,sei=2,sie=2,sii=2,
@@ -1055,9 +1070,19 @@ def Diff_coeff_Plastic(x,eps, th_e, th_i, t,
     denom_re=(2*eps*((E0+I0)*tau_re))
     denom_ri=(2*eps*((E0+I0)*tau_ri))
     
+    denom_erf_qe=np.sqrt(2*eps*((E0+I0)*tau_qe))
+    denom_erf_qi=np.sqrt(2*eps*((E0+I0)*tau_qi))
+    denom_erf_re=np.sqrt(2*eps*((E0+I0)*tau_re))
+    denom_erf_ri=np.sqrt(2*eps*((E0+I0)*tau_ri))
+    
+    Qe=QE*LongTime_Err(x, -ae,ae,tau_qe,denom_erf_qe)
+    Qi=QI*LongTime_Err(x, -ai,ai,tau_qi,denom_erf_qi)
+    Re=(RE-1)*LongTime_Err(x, -ae,ae,tau_re,denom_erf_re)+1
+    Ri=(RI-1)*LongTime_Err(x, -ai,ai,tau_ri,denom_erf_ri)+1
+    
     #Defining more convenient constants and constant arrays
-    ke=weight(ae+ai,Aei,sei)-weight(ae-ai,Aei,sei)
-    ki=weight(ae+ai,Aie,sie)-weight(ae-ai,Aie,sie)
+    ke=(weight(ae+ai,Aei,sei)-weight(ae-ai,Aei,sei))
+    ki=(weight(ae+ai,Aie,sie)-weight(ae-ai,Aie,sie))
     
     ingral1=Tophat(x,-ae,ae)*(weight(ae-x,Aee,see)-weight(-ae-x,Aee,see))
     ingral2=Tophat(x,-ai,ai)*(weight(ae-x,Aei,sei)-weight(-ae-x,Aei,sei))
@@ -1065,10 +1090,10 @@ def Diff_coeff_Plastic(x,eps, th_e, th_i, t,
     ingral4=Tophat(x,-ai,ai)*(weight(ai-x,Aii,sii)-weight(-ai-x,Aii,sii))
     
     #all the partial spatial derivatives of plasticity
-    d_qe=QE*LongTime_dstp(x,-ae,ae, denom_qe)
-    d_qi=QI*LongTime_dstp(x,-ai,ai, denom_qi)
-    d_re=(RE-1)*LongTime_dstp(x,-ae,ae, denom_re)
-    d_ri=(RI-1)*LongTime_dstp(x,-ai,ai, denom_ri)
+    d_qe=(Re)*QE*LongTime_dstp(x,-ae,ae, denom_qe)
+    d_qi=(Ri)*QI*LongTime_dstp(x,-ai,ai, denom_qi)
+    d_re=(1+Qe)*(RE-1)*LongTime_dstp(x,-ae,ae, denom_re)
+    d_ri=(1+Qi)*(RI-1)*LongTime_dstp(x,-ai,ai, denom_ri)
     
     #Setting up matrix M
     r1=np.array([-2*ke-(((d_re+d_qe)*ingral1).sum()*dx), 
